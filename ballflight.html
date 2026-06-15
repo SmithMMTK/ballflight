@@ -25,6 +25,10 @@
   h1{ font-size:22px; font-weight:500; margin:0 0 4px; }
   .sub{ color:var(--text2); font-size:14px; margin:0 0 1.5rem; }
   .ver{ font-size:11px; color:var(--text3); font-weight:400; margin-left:8px; vertical-align:middle; letter-spacing:0.02em; }
+  .club-toggle{ display:inline-flex; background:var(--surface2); border-radius:8px; padding:3px; margin-bottom:1rem; border:0.5px solid var(--border); }
+  .ct-btn{ padding:5px 14px; border:none; background:transparent; color:var(--text2); border-radius:6px; cursor:pointer; font-size:12px; font-weight:500; transition:color 0.15s, background 0.15s; }
+  .ct-btn.active{ background:var(--surface); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+  .ct-btn:hover:not(.active){ color:var(--text); }
   .ctrls{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1.25rem; }
   .ctrl-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
   label{ font-size:13px; color:var(--text2); }
@@ -51,8 +55,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path <span class="ver">v1.2</span></h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.3</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
+
+  <div class="club-toggle" role="tablist" aria-label="Club type">
+    <button type="button" class="ct-btn active" data-club="driver" role="tab" aria-selected="true">Driver</button>
+    <button type="button" class="ct-btn" data-club="iron" role="tab" aria-selected="false">Iron</button>
+  </div>
 
   <div class="ctrls">
     <div>
@@ -67,8 +76,8 @@
     </div>
     <div>
       <div class="ctrl-head"><label>Carry distance</label><span id="distOut" style="font-size:13px;font-weight:500">250 yd</span></div>
-      <input type="range" id="dist" min="80" max="300" step="5" value="250">
-      <div class="ends"><span>80</span><span>300</span></div>
+      <input type="range" id="dist" min="200" max="320" step="5" value="250">
+      <div class="ends"><span id="distMinLbl">200</span><span id="distMaxLbl">320</span></div>
     </div>
   </div>
 
@@ -82,7 +91,7 @@
 
   <div class="panels">
     <div>
-      <div class="cap">impact — driver face vs target (top view)</div>
+      <div class="cap">impact — <span id="capClub">driver</span> face vs target (top view)</div>
       <svg id="faceSvg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" role="img">
         <title>Driver clubhead vs target line and club path</title>
         <defs>
@@ -156,7 +165,7 @@
   </div>
 
   <div class="note">
-    <strong>D-Plane (verified):</strong> The ball launches at <strong>~80% face + 20% path</strong> (driver; irons ~85/15). Spin axis tilt &asymp; (face &minus; path) &times; 4&deg; (clamped to &plusmn;30&deg;), producing &asymp; 3.5 yd of curve per 100 yd carry per 1&deg; of face-to-path. <em>Initial direction</em> shows where the ball starts; <em>offline</em> is the final landing deviation = D&middot;sin(launch) + curve. Face open to path &rarr; fade/slice (R). Face closed to path &rarr; draw/hook (L).
+    <strong>D-Plane (verified):</strong> The ball launches at <strong>~80% face + 20% path</strong> for a <em>driver</em>, or <strong>~85% face + 15% path</strong> for an <em>iron</em> (steeper AoA &rarr; less path contribution). Spin axis tilt &asymp; (face &minus; path) &times; 4&deg; (driver) or &times; 5&deg; (iron), clamped to &plusmn;30&deg;. Curve &asymp; 3.5 yd (driver) or 4 yd (iron, more spin) per 100 yd carry per 1&deg; of face-to-path. <em>Initial direction</em> = where the ball starts; <em>offline</em> = D&middot;sin(launch) + curve. Face open to path &rarr; fade/slice (R). Face closed to path &rarr; draw/hook (L).
   </div>
 </div>
 
@@ -169,7 +178,30 @@
   var spinGroup=$('spinGroup'),flightPath=$('flightPath'),pathLine=$('pathLine');
   var ball=$('ball'),eq1=$('eq1'),pathGroup=$('pathGroup'),clubGroup=$('clubGroup');
   var landing=$('landing'),offLine=$('offLine'),offText=$('offText'),flightLbl=$('flightLbl'),scaleLbl=$('scaleLbl');
-  var DEF={f:0,p:0,d:250}, t=0;
+  var distMinLbl=$('distMinLbl'),distMaxLbl=$('distMaxLbl'),capClub=$('capClub');
+  // Per-club D-Plane coefficients (Trackman-derived):
+  //   driver: shallow AoA, low spin (~2500 rpm) → less path contribution to launch, smaller axis tilt per °f2p
+  //   iron:   steeper AoA, high spin (~7000 rpm) → more face influence, larger axis tilt per °f2p
+  var CLUBS={
+    driver:{launchRatio:0.80, axisMult:4, curveCoef:3.5, distDefault:250, distMin:200, distMax:320, label:'driver'},
+    iron:  {launchRatio:0.85, axisMult:5, curveCoef:4.0, distDefault:150, distMin:80,  distMax:220, label:'iron'}
+  };
+  var club='driver';
+  function setClub(name){
+    if(!CLUBS[name]) return;
+    club=name;
+    var c=CLUBS[name];
+    dist.min=c.distMin; dist.max=c.distMax; dist.value=c.distDefault;
+    distMinLbl.textContent=c.distMin; distMaxLbl.textContent=c.distMax;
+    capClub.textContent=c.label;
+    document.querySelectorAll('.ct-btn').forEach(function(b){
+      var active=b.dataset.club===name;
+      b.classList.toggle('active',active);
+      b.setAttribute('aria-selected',active?'true':'false');
+    });
+    t=0; update();
+  }
+  var DEF={f:0,p:0}, t=0;
   function sgn(n){return n>0?'+':'';}
   function shapeName(axis,p){
     var c; if(Math.abs(axis)<3)c='straight'; else if(axis>0)c=Math.abs(axis)>18?'slice':'fade'; else c=Math.abs(axis)>18?'hook':'draw';
@@ -180,17 +212,19 @@
   var geom;
   function update(){
     var f=parseFloat(face.value),p=parseFloat(path.value),D=parseFloat(dist.value);
+    var cfg=CLUBS[club];
     // D-Plane (Trackman/launch monitor research):
-    //   Launch direction ≈ 80% face + 20% path (driver; irons ~85/15 due to steeper AoA)
-    //   Spin axis tilt ≈ face-to-path × 4° (driver) — clamped to ±30° (real-world max)
-    //   Curve ≈ f2p × 3.5 yd per 100 yd carry
-    //   Lateral offline = D·sin(launchDir) + curveYd   (small-angle parabolic model)
+    //   Launch direction = launchRatio·face + (1−launchRatio)·path
+    //     driver: 80/20, iron: 85/15 (steeper AoA → less gear effect)
+    //   Spin axis tilt ≈ face-to-path × axisMult (driver: 4°, iron: 5°), clamped to ±30°
+    //   Curve ≈ f2p × curveCoef yd per 100 yd carry (driver: 3.5, iron: 4.0)
+    //   Lateral offline = D·sin(launchDir) + curveYd  (small-angle parabolic model)
     var f2p=f-p;
-    var axisRaw=f2p*4;
+    var axisRaw=f2p*cfg.axisMult;
     var axis=Math.round(Math.max(-30,Math.min(30,axisRaw)));
-    var launchDir=0.80*f+0.20*p;
+    var launchDir=cfg.launchRatio*f+(1-cfg.launchRatio)*p;
     var launchYd=D*Math.sin(launchDir*Math.PI/180);
-    var curveYd=f2p*(D/100)*3.5;
+    var curveYd=f2p*(D/100)*cfg.curveCoef;
     var offline=launchYd+curveYd, offR=Math.round(offline);
     faceOut.innerHTML=sgn(f)+f.toFixed(1)+'&deg;';
     pathOut.innerHTML=sgn(p)+p.toFixed(1)+'&deg;';
@@ -235,10 +269,13 @@
   }
   requestAnimationFrame(animate);
   face.addEventListener('input',update); path.addEventListener('input',update); dist.addEventListener('input',update);
+  document.querySelectorAll('.ct-btn').forEach(function(b){
+    b.addEventListener('click',function(){ setClub(b.dataset.club); });
+  });
   document.querySelectorAll('.presets button[data-f]').forEach(function(b){
     b.addEventListener('click',function(){ face.value=b.dataset.f; path.value=b.dataset.p; t=0; update(); });
   });
-  $('reset').addEventListener('click',function(){ face.value=DEF.f; path.value=DEF.p; dist.value=DEF.d; t=0; update(); });
+  $('reset').addEventListener('click',function(){ face.value=DEF.f; path.value=DEF.p; dist.value=CLUBS[club].distDefault; t=0; update(); });
 })();
 </script>
 </body>
