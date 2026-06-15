@@ -153,7 +153,7 @@
   </div>
 
   <div class="note">
-    <strong>D-Plane (verified):</strong> The ball launches at <strong>85% face + 15% path</strong> (driver). Spin axis tilt &asymp; (face &minus; path) &times; 6&deg;, causing a curve of &asymp; 3.5 yd per 100 yd carry per 1&deg; of face-to-path. <em>Initial direction</em> shows where the ball starts; <em>offline</em> is the final landing deviation. Face open to path &rarr; fade/slice (R). Face closed to path &rarr; draw/hook (L).
+    <strong>D-Plane (verified):</strong> The ball launches at <strong>~80% face + 20% path</strong> (driver; irons ~85/15). Spin axis tilt &asymp; (face &minus; path) &times; 4&deg; (clamped to &plusmn;30&deg;), producing &asymp; 3.5 yd of curve per 100 yd carry per 1&deg; of face-to-path. <em>Initial direction</em> shows where the ball starts; <em>offline</em> is the final landing deviation = D&middot;sin(launch) + curve. Face open to path &rarr; fade/slice (R). Face closed to path &rarr; draw/hook (L).
   </div>
 </div>
 
@@ -177,12 +177,15 @@
   var geom;
   function update(){
     var f=parseFloat(face.value),p=parseFloat(path.value),D=parseFloat(dist.value);
-    var f2p=f-p, axis=Math.round(f2p*6);
     // D-Plane (Trackman/launch monitor research):
-    //   Launch direction = 85% face + 15% path (driver; irons ~75/25)
-    //   Spin axis tilt ≈ face-to-path × 6° (driver)
+    //   Launch direction ≈ 80% face + 20% path (driver; irons ~85/15 due to steeper AoA)
+    //   Spin axis tilt ≈ face-to-path × 4° (driver) — clamped to ±30° (real-world max)
     //   Curve ≈ f2p × 3.5 yd per 100 yd carry
-    var launchDir=0.85*f+0.15*p;
+    //   Lateral offline = D·sin(launchDir) + curveYd   (small-angle parabolic model)
+    var f2p=f-p;
+    var axisRaw=f2p*4;
+    var axis=Math.round(Math.max(-30,Math.min(30,axisRaw)));
+    var launchDir=0.80*f+0.20*p;
     var launchYd=D*Math.sin(launchDir*Math.PI/180);
     var curveYd=f2p*(D/100)*3.5;
     var offline=launchYd+curveYd, offR=Math.round(offline);
@@ -202,7 +205,10 @@
     spinGroup.setAttribute('transform','rotate('+visTilt+' 120 150)');
     var y0=220, topY=40, vSpan=y0-topY, pxPerYd=vSpan/D;
     var startPx=launchYd*pxPerYd, offPx=curveYd*pxPerYd;
-    var x0=280, xEnd=280+startPx+offPx, xMid=280+startPx*0.55+offPx*0.25;
+    // Physics-correct Bézier control point: ball position x(τ) = launchYd·τ + curveYd·τ²
+    // is exactly a quadratic Bézier with control x = x0 + startPx/2  (and y at the linear midpoint).
+    // This makes pulls actually launch left, slices delay the curve until late, etc.
+    var x0=280, xEnd=280+startPx+offPx, xMid=280+startPx*0.5;
     flightPath.setAttribute('d','M '+x0+' '+y0+' Q '+xMid+' '+((y0+topY)/2)+' '+xEnd+' '+topY);
     pathLine.setAttribute('x2',280+p*(D/100)*pxPerYd); pathLine.setAttribute('y2',topY);
     landing.setAttribute('cx',xEnd); landing.setAttribute('cy',topY);
