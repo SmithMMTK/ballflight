@@ -56,7 +56,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path <span class="ver">v1.8</span></h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.9</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
 
   <div class="club-toggle" role="tablist" aria-label="Club type">
@@ -208,7 +208,7 @@
     });
     t=0; playing=false; update(); replay();
   }
-  var DEF={f:0,p:0}, t=0, playing=false;
+  var DEF={f:0,p:0}, t=0, playing=false, loopCount=0;
   function sgn(n){return n>0?'+':'';}
   function shapeName(axis,p){
     var c; if(Math.abs(axis)<3)c='straight'; else if(axis>0)c=Math.abs(axis)>18?'slice':'fade'; else c=Math.abs(axis)>18?'hook':'draw';
@@ -271,8 +271,15 @@
   //   t ∈ [0, IMPACT_T): approach — clubhead slides along path from -90 px → 0 (impact)
   //   t ∈ [IMPACT_T, FOLLOW_T): follow-through — clubhead continues 0 → +30 px past ball
   //   t ∈ [IMPACT_T, 1): ball flight begins at impact and continues to landing
-  // Plays once per trigger (slider change, preset, club toggle, reset, or Replay button).
-  var IMPACT_T=0.22, FOLLOW_T=0.42, DT=0.004; // ~4s cycle at 60 fps
+  // Plays MAX_LOOPS times per trigger (slider change, preset, club toggle, reset, or Replay button).
+  var IMPACT_T=0.22, FOLLOW_T=0.42, DT=0.004, MAX_LOOPS=5; // ~4s/cycle × 5 ≈ 20s total
+  var replayBtn=null; // resolved after DOM lookup below
+  function setReplayLabel(){
+    if(!replayBtn) return;
+    replayBtn.innerHTML = playing
+      ? '&#9658; '+(loopCount+1)+'/'+MAX_LOOPS
+      : '&#9658; Replay';
+  }
   function renderClub(){
     var f=parseFloat(face.value), p=parseFloat(path.value);
     var pathRad=p*2.4*Math.PI/180;
@@ -301,16 +308,28 @@
   function animate(){
     if(!playing) return;
     t+=DT;
-    if(t>=1){ t=1; playing=false; renderClub(); renderBall(); return; }
+    if(t>=1){
+      loopCount++;
+      if(loopCount>=MAX_LOOPS){
+        t=1; playing=false;
+        renderClub(); renderBall();
+        setReplayLabel();
+        return;
+      }
+      t=0;
+      setReplayLabel(); // shows next-loop number while still playing
+    }
     renderClub(); renderBall();
     requestAnimationFrame(animate);
   }
   function replay(){
-    t=0;
-    if(playing) return; // already running — will pick up new t next frame
+    t=0; loopCount=0;
+    if(playing){ setReplayLabel(); return; } // already running — counter resets, loop continues
     playing=true;
+    setReplayLabel();
     requestAnimationFrame(animate);
   }
+  replayBtn=$('replay');
   replay();
   function updateAndReplay(){ update(); replay(); }
   face.addEventListener('input',updateAndReplay);
