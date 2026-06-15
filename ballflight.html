@@ -55,7 +55,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path <span class="ver">v1.4</span></h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.5</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
 
   <div class="club-toggle" role="tablist" aria-label="Club type">
@@ -123,17 +123,21 @@
       <div class="cap">spinning ball (rear view)</div>
       <svg id="ballSvg" viewBox="0 0 240 300" xmlns="http://www.w3.org/2000/svg" role="img">
         <title>Golf ball with tilted spin axis</title>
+        <defs>
+          <marker id="axishead" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 Z" fill="#D85A30"/>
+          </marker>
+        </defs>
         <line x1="120" y1="38" x2="120" y2="262" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
         <line x1="40" y1="150" x2="200" y2="150" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
         <circle cx="120" cy="150" r="72" fill="var(--surface2)" stroke="var(--border2)" stroke-width="1"/>
         <g id="spinGroup">
-          <line x1="120" y1="68" x2="120" y2="232" stroke="#D85A30" stroke-width="3"/>
-          <ellipse id="eq1" cx="120" cy="150" rx="72" ry="22" fill="none" stroke="#1D9E75" stroke-width="1.5" opacity="0.85"/>
-          <ellipse cx="120" cy="150" rx="72" ry="44" fill="none" stroke="#1D9E75" stroke-width="1" opacity="0.4"/>
+          <line x1="120" y1="232" x2="120" y2="62" stroke="#D85A30" stroke-width="3" stroke-linecap="round" marker-end="url(#axishead)"/>
+          <ellipse cx="120" cy="150" rx="72" ry="20" fill="none" stroke="#1D9E75" stroke-width="1.5" opacity="0.75"/>
         </g>
         <circle cx="120" cy="150" r="3" fill="var(--text2)"/>
       </svg>
-      <div class="leg"><span style="color:#D85A30">&#9472;</span> spin axis &nbsp; <span style="color:#1D9E75">&#9472;</span> spin equator</div>
+      <div class="leg"><span style="color:#D85A30">&#9650;</span> spin axis (arrow = top) &nbsp; <span style="color:#1D9E75">&#9472;</span> spin equator</div>
     </div>
   </div>
 
@@ -176,7 +180,7 @@
   var faceOut=$('faceOut'),pathOut=$('pathOut'),distOut=$('distOut');
   var f2pOut=$('f2pOut'),axisOut=$('axisOut'),offOut=$('offOut'),shapeOut=$('shapeOut');
   var spinGroup=$('spinGroup'),flightPath=$('flightPath'),pathLine=$('pathLine');
-  var ball=$('ball'),eq1=$('eq1'),pathGroup=$('pathGroup'),clubGroup=$('clubGroup');
+  var ball=$('ball'),pathGroup=$('pathGroup'),clubGroup=$('clubGroup');
   var landing=$('landing'),offLine=$('offLine'),offText=$('offText'),flightLbl=$('flightLbl'),scaleLbl=$('scaleLbl');
   var distMinLbl=$('distMinLbl'),distMaxLbl=$('distMaxLbl'),capClub=$('capClub'),clubImg=$('clubImg'),clubTitle=$('clubTitle');
   // Per-club D-Plane coefficients (Trackman-derived):
@@ -265,8 +269,6 @@
     var bx=u*u*geom.x0+2*u*t*geom.xMid+t*t*geom.xEnd;
     var by=u*u*geom.y0+2*u*t*((geom.y0+geom.topY)/2)+t*t*geom.topY;
     ball.setAttribute('cx',bx); ball.setAttribute('cy',by);
-    var ph=(Date.now()/220)%(Math.PI*2),r=Math.abs(Math.cos(ph));
-    eq1.setAttribute('ry',8+r*60); eq1.setAttribute('opacity',0.35+r*0.55);
     requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
