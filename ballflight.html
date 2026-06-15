@@ -47,15 +47,16 @@
     background:transparent; color:var(--text); border-radius:8px; cursor:pointer; }
   button:hover{ background:var(--surface2); }
   button:active{ transform:scale(0.98); }
-  #reset{ margin-left:auto; border-color:var(--border3); }
+  #replay{ margin-left:auto; border-color:var(--blue); color:var(--blue); }
+  #reset{ border-color:var(--border3); }
   .note{ margin-top:1.5rem; font-size:13px; color:var(--text2); background:var(--surface);
     border:0.5px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; }
-  @media (max-width:560px){ .panels{ grid-template-columns:1fr; } .stats{ grid-template-columns:1fr 1fr; } .ctrls{ grid-template-columns:1fr; } #reset{ margin-left:0; } }
+  @media (max-width:560px){ .panels{ grid-template-columns:1fr; } .stats{ grid-template-columns:1fr 1fr; } .ctrls{ grid-template-columns:1fr; } #replay{ margin-left:0; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path <span class="ver">v1.7</span></h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.8</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
 
   <div class="club-toggle" role="tablist" aria-label="Club type">
@@ -164,6 +165,7 @@
     <button data-f="-2" data-p="-3">Perfect Fade</button>
     <button data-f="4" data-p="-2">Slice</button>
     <button data-f="-4" data-p="2">Hook</button>
+    <button id="replay">&#9658; Replay</button>
     <button id="reset">&#8634; Reset</button>
   </div>
 
@@ -204,9 +206,9 @@
       b.classList.toggle('active',active);
       b.setAttribute('aria-selected',active?'true':'false');
     });
-    t=0; update();
+    t=0; playing=false; update(); replay();
   }
-  var DEF={f:0,p:0}, t=0;
+  var DEF={f:0,p:0}, t=0, playing=false;
   function sgn(n){return n>0?'+':'';}
   function shapeName(axis,p){
     var c; if(Math.abs(axis)<3)c='straight'; else if(axis>0)c=Math.abs(axis)>18?'slice':'fade'; else c=Math.abs(axis)>18?'hook':'draw';
@@ -269,7 +271,8 @@
   //   t ∈ [0, IMPACT_T): approach — clubhead slides along path from -90 px → 0 (impact)
   //   t ∈ [IMPACT_T, FOLLOW_T): follow-through — clubhead continues 0 → +30 px past ball
   //   t ∈ [IMPACT_T, 1): ball flight begins at impact and continues to landing
-  var IMPACT_T=0.22, FOLLOW_T=0.42;
+  // Plays once per trigger (slider change, preset, club toggle, reset, or Replay button).
+  var IMPACT_T=0.22, FOLLOW_T=0.42, DT=0.004; // ~4s cycle at 60 fps
   function renderClub(){
     var f=parseFloat(face.value), p=parseFloat(path.value);
     var pathRad=p*2.4*Math.PI/180;
@@ -285,9 +288,7 @@
     var tx=d*Math.sin(pathRad), ty=-d*Math.cos(pathRad);
     clubGroup.setAttribute('transform','translate('+tx.toFixed(2)+' '+ty.toFixed(2)+') rotate('+(f*2.4)+' 150 158)');
   }
-  function animate(){
-    t+=0.008; if(t>1)t=0;
-    renderClub();
+  function renderBall(){
     var bx,by;
     if(t<IMPACT_T){ bx=geom.x0; by=geom.y0; }
     else {
@@ -296,17 +297,33 @@
       by=u*u*geom.y0+2*u*ft*((geom.y0+geom.topY)/2)+ft*ft*geom.topY;
     }
     ball.setAttribute('cx',bx); ball.setAttribute('cy',by);
+  }
+  function animate(){
+    if(!playing) return;
+    t+=DT;
+    if(t>=1){ t=1; playing=false; renderClub(); renderBall(); return; }
+    renderClub(); renderBall();
     requestAnimationFrame(animate);
   }
-  requestAnimationFrame(animate);
-  face.addEventListener('input',update); path.addEventListener('input',update); dist.addEventListener('input',update);
+  function replay(){
+    t=0;
+    if(playing) return; // already running — will pick up new t next frame
+    playing=true;
+    requestAnimationFrame(animate);
+  }
+  replay();
+  function updateAndReplay(){ update(); replay(); }
+  face.addEventListener('input',updateAndReplay);
+  path.addEventListener('input',updateAndReplay);
+  dist.addEventListener('input',updateAndReplay);
   document.querySelectorAll('.ct-btn').forEach(function(b){
     b.addEventListener('click',function(){ setClub(b.dataset.club); });
   });
   document.querySelectorAll('.presets button[data-f]').forEach(function(b){
-    b.addEventListener('click',function(){ face.value=b.dataset.f; path.value=b.dataset.p; t=0; update(); });
+    b.addEventListener('click',function(){ face.value=b.dataset.f; path.value=b.dataset.p; updateAndReplay(); });
   });
-  $('reset').addEventListener('click',function(){ face.value=DEF.f; path.value=DEF.p; dist.value=CLUBS[club].distDefault; t=0; update(); });
+  $('replay').addEventListener('click',replay);
+  $('reset').addEventListener('click',function(){ face.value=DEF.f; path.value=DEF.p; dist.value=CLUBS[club].distDefault; updateAndReplay(); });
 })();
 </script>
 </body>
