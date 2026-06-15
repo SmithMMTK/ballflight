@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf Spin Axis — Face vs Path</title>
+<style>
+  :root{
+    --bg:#faf9f5; --surface:#ffffff; --surface2:#f1efe8;
+    --text:#2c2c2a; --text2:#5f5e5a; --text3:#888780;
+    --border:rgba(0,0,0,0.12); --border2:rgba(0,0,0,0.2); --border3:rgba(0,0,0,0.35);
+    --coral:#D85A30; --coral-d:#993C1D; --blue:#378ADD; --blue-d:#185FA5; --green:#1D9E75;
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#262624; --surface:#30302e; --surface2:#1f1f1d;
+      --text:#f5f4ef; --text2:#b4b2a9; --text3:#888780;
+      --border:rgba(255,255,255,0.14); --border2:rgba(255,255,255,0.25); --border3:rgba(255,255,255,0.4); }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; padding:1.5rem 1rem; }
+  .wrap{ max-width:680px; margin:0 auto; }
+  h1{ font-size:22px; font-weight:500; margin:0 0 4px; }
+  .sub{ color:var(--text2); font-size:14px; margin:0 0 1.5rem; }
+  .ctrls{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1.25rem; }
+  .ctrl-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  label{ font-size:13px; color:var(--text2); }
+  input[type=range]{ width:100%; accent-color:var(--green); }
+  .ends{ display:flex; justify-content:space-between; font-size:11px; color:var(--text3); margin-top:2px; }
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:1.25rem; }
+  .stat{ background:var(--surface2); border-radius:8px; padding:0.7rem 0.9rem; }
+  .stat .lbl{ font-size:12px; color:var(--text2); }
+  .stat .val{ font-size:20px; font-weight:500; }
+  .panels{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-bottom:16px; }
+  .cap{ font-size:12px; color:var(--text3); margin-bottom:6px; text-align:center; }
+  .leg{ font-size:11px; color:var(--text3); text-align:center; margin-top:2px; }
+  svg{ width:100%; }
+  .presets{ margin-top:1rem; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button{ font-size:12px; padding:6px 12px; border:0.5px solid var(--border2);
+    background:transparent; color:var(--text); border-radius:8px; cursor:pointer; }
+  button:hover{ background:var(--surface2); }
+  button:active{ transform:scale(0.98); }
+  #reset{ margin-left:auto; border-color:var(--border3); }
+  .note{ margin-top:1.5rem; font-size:13px; color:var(--text2); background:var(--surface);
+    border:0.5px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; }
+  @media (max-width:560px){ .panels{ grid-template-columns:1fr; } .stats{ grid-template-columns:1fr 1fr; } .ctrls{ grid-template-columns:1fr; } #reset{ margin-left:0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Golf spin axis — face vs path</h1>
+  <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
+
+  <div class="ctrls">
+    <div>
+      <div class="ctrl-head"><label>Face to target</label><span id="faceOut" style="font-size:13px;font-weight:500;color:var(--coral)">0.0&deg;</span></div>
+      <input type="range" id="face" min="-10" max="10" step="0.5" value="0">
+      <div class="ends"><span>closed</span><span>open</span></div>
+    </div>
+    <div>
+      <div class="ctrl-head"><label>Club path</label><span id="pathOut" style="font-size:13px;font-weight:500;color:var(--blue)">0.0&deg;</span></div>
+      <input type="range" id="path" min="-10" max="10" step="0.5" value="0">
+      <div class="ends"><span>out-in</span><span>in-out</span></div>
+    </div>
+    <div>
+      <div class="ctrl-head"><label>Carry distance</label><span id="distOut" style="font-size:13px;font-weight:500">250 yd</span></div>
+      <input type="range" id="dist" min="80" max="300" step="5" value="250">
+      <div class="ends"><span>80</span><span>300</span></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="lbl">Face to path</div><div class="val" id="f2pOut">0.0&deg;</div></div>
+    <div class="stat"><div class="lbl">Spin axis</div><div class="val" id="axisOut">0&deg;</div></div>
+    <div class="stat"><div class="lbl">Initial direction</div><div class="val" id="initDirOut">0.0&deg;</div></div>
+    <div class="stat"><div class="lbl">Offline</div><div class="val" id="offOut">0 yd</div></div>
+    <div class="stat"><div class="lbl">Shape</div><div class="val" id="shapeOut" style="font-size:16px">Straight</div></div>
+  </div>
+
+  <div class="panels">
+    <div>
+      <div class="cap">impact — driver face vs target (top view)</div>
+      <svg id="faceSvg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" role="img">
+        <title>Driver clubhead vs target line and club path</title>
+        <defs>
+          <marker id="bluehead" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#378ADD"/></marker>
+          <marker id="coralhead" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#D85A30"/></marker>
+          <marker id="grayhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--text3)"/></marker>
+          <radialGradient id="crownGrad" cx="44%" cy="34%" r="72%">
+            <stop offset="0%" stop-color="#3c3c3e"/>
+            <stop offset="52%" stop-color="#1d1d1f"/>
+            <stop offset="100%" stop-color="#070708"/>
+          </radialGradient>
+        </defs>
+        <line x1="150" y1="34" x2="150" y2="300" stroke="var(--text3)" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#grayhead)"/>
+        <text x="150" y="24" text-anchor="middle" font-size="11" fill="var(--text2)" font-weight="500">target line</text>
+        <g id="pathGroup"><line x1="150" y1="256" x2="150" y2="78" stroke="#378ADD" stroke-width="2.5" marker-end="url(#bluehead)"/></g>
+        <text x="150" y="274" text-anchor="middle" font-size="11" fill="#185FA5" font-weight="500">club path</text>
+        <g id="clubGroup">
+          <image href="image.png" x="97" y="86" width="106" height="106" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>
+          <line x1="116" y1="158" x2="184" y2="158" stroke="#D85A30" stroke-width="4.5" stroke-linecap="round"/>
+          <line x1="150" y1="156" x2="150" y2="98" stroke="#D85A30" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#coralhead)"/>
+        </g>
+
+        <circle cx="150" cy="158" r="4" fill="#fff" stroke="#999" stroke-width="0.5"/>
+      </svg>
+      <div class="leg"><span style="color:#D85A30">&#9472;</span> face &nbsp; <span style="color:#378ADD">&#9472;</span> path &nbsp; <span style="color:var(--text3)">&#9476;</span> target</div>
+    </div>
+
+    <div>
+      <div class="cap">spinning ball (rear view)</div>
+      <svg id="ballSvg" viewBox="0 0 240 300" xmlns="http://www.w3.org/2000/svg" role="img">
+        <title>Golf ball with tilted spin axis</title>
+        <line x1="120" y1="38" x2="120" y2="262" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="40" y1="150" x2="200" y2="150" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+        <circle cx="120" cy="150" r="72" fill="var(--surface2)" stroke="var(--border2)" stroke-width="1"/>
+        <g id="spinGroup">
+          <line x1="120" y1="68" x2="120" y2="232" stroke="#D85A30" stroke-width="3"/>
+          <ellipse id="eq1" cx="120" cy="150" rx="72" ry="22" fill="none" stroke="#1D9E75" stroke-width="1.5" opacity="0.85"/>
+          <ellipse cx="120" cy="150" rx="72" ry="44" fill="none" stroke="#1D9E75" stroke-width="1" opacity="0.4"/>
+        </g>
+        <circle cx="120" cy="150" r="3" fill="var(--text2)"/>
+      </svg>
+      <div class="leg"><span style="color:#D85A30">&#9472;</span> spin axis &nbsp; <span style="color:#1D9E75">&#9472;</span> spin equator</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="cap">ball flight (top-down, to scale) — <span id="flightLbl">carry 250 yd &middot; offline 0 yd center</span></div>
+    <svg id="flightSvg" viewBox="0 0 560 260" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>Top-down ball flight scaled to true offline in yards</title>
+      <line x1="280" y1="20" x2="280" y2="220" stroke="var(--text3)" stroke-width="1.5" stroke-dasharray="4 4"/>
+      <text x="280" y="234" text-anchor="middle" font-size="11" fill="var(--text2)">target line</text>
+      <text id="scaleLbl" x="548" y="216" text-anchor="end" font-size="10" fill="var(--text3)"></text>
+      <line id="pathLine" x1="280" y1="220" x2="280" y2="40" stroke="#378ADD" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.6"/>
+      <path id="flightPath" d="" fill="none" stroke="#1D9E75" stroke-width="2.5"/>
+      <line id="offLine" x1="280" y1="40" x2="280" y2="40" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <circle id="landing" cx="280" cy="40" r="5" fill="#1D9E75"/>
+      <text id="offText" x="280" y="34" text-anchor="middle" font-size="11" fill="#993C1D" font-weight="500"></text>
+      <circle id="ball" cx="280" cy="220" r="4.5" fill="#1D9E75" opacity="0.55"/>
+    </svg>
+  </div>
+
+  <div class="presets">
+    <button data-f="-1" data-p="-3">Pull-fade</button>
+    <button data-f="1" data-p="3">Push-draw</button>
+    <button data-f="0" data-p="0">Straight</button>
+    <button data-f="4" data-p="-2">Slice</button>
+    <button data-f="-4" data-p="2">Hook</button>
+    <button id="reset">&#8634; Reset</button>
+  </div>
+
+  <div class="note">
+    <strong>D-Plane (verified):</strong> The ball launches at <strong>85% face + 15% path</strong> (driver). Spin axis tilt &asymp; (face &minus; path) &times; 6&deg;, causing a curve of &asymp; 3.5 yd per 100 yd carry per 1&deg; of face-to-path. <em>Initial direction</em> shows where the ball starts; <em>offline</em> is the final landing deviation. Face open to path &rarr; fade/slice (R). Face closed to path &rarr; draw/hook (L).
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var face=$('face'),path=$('path'),dist=$('dist');
+  var faceOut=$('faceOut'),pathOut=$('pathOut'),distOut=$('distOut');
+  var f2pOut=$('f2pOut'),axisOut=$('axisOut'),offOut=$('offOut'),shapeOut=$('shapeOut');
+  var spinGroup=$('spinGroup'),flightPath=$('flightPath'),pathLine=$('pathLine');
+  var ball=$('ball'),eq1=$('eq1'),pathGroup=$('pathGroup'),clubGroup=$('clubGroup');
+  var landing=$('landing'),offLine=$('offLine'),offText=$('offText'),flightLbl=$('flightLbl'),scaleLbl=$('scaleLbl');
+  var DEF={f:0,p:0,d:250}, t=0;
+  function sgn(n){return n>0?'+':'';}
+  function shapeName(axis,p){
+    var c; if(Math.abs(axis)<3)c='straight'; else if(axis>0)c=Math.abs(axis)>18?'slice':'fade'; else c=Math.abs(axis)>18?'hook':'draw';
+    var s; if(Math.abs(p)<1.0)s=''; else if(p>0)s='Push-'; else s='Pull-';
+    if(c==='straight')return s?s.slice(0,-1):'Straight';
+    return s?(s+c):(c.charAt(0).toUpperCase()+c.slice(1));
+  }
+  var geom;
+  function update(){
+    var f=parseFloat(face.value),p=parseFloat(path.value),D=parseFloat(dist.value);
+    var f2p=f-p, axis=Math.round(f2p*6);
+    // D-Plane (Trackman/launch monitor research):
+    //   Launch direction = 85% face + 15% path (driver; irons ~75/25)
+    //   Spin axis tilt ≈ face-to-path × 6° (driver)
+    //   Curve ≈ f2p × 3.5 yd per 100 yd carry
+    var launchDir=0.85*f+0.15*p;
+    var launchYd=D*Math.sin(launchDir*Math.PI/180);
+    var curveYd=f2p*(D/100)*3.5;
+    var offline=launchYd+curveYd, offR=Math.round(offline);
+    faceOut.innerHTML=sgn(f)+f.toFixed(1)+'&deg;';
+    pathOut.innerHTML=sgn(p)+p.toFixed(1)+'&deg;';
+    distOut.textContent=D+' yd';
+    f2pOut.innerHTML=sgn(f2p)+f2p.toFixed(1)+'&deg;';
+    axisOut.innerHTML=sgn(axis)+axis+'&deg;';
+    var ldR=Math.round(launchDir*10)/10;
+    initDirOut.innerHTML=sgn(ldR)+Math.abs(ldR).toFixed(1)+'&deg;&nbsp;'+(ldR>0?'<span style="color:var(--coral)">R</span>':ldR<0?'<span style="color:#378ADD">L</span>':'&mdash;');
+    offOut.textContent=Math.abs(offR)+' yd'+(offR>0?' R':offR<0?' L':'');
+    shapeOut.textContent=shapeName(axis,p);
+    flightLbl.innerHTML='carry '+D+' yd &middot; offline '+Math.abs(offR)+' yd '+(offR>0?'right':offR<0?'left':'center');
+    pathGroup.setAttribute('transform','rotate('+(p*2.4)+' 150 158)');
+    clubGroup.setAttribute('transform','rotate('+(f*2.4)+' 150 158)');
+    var visTilt=Math.max(-45,Math.min(45,axis));
+    spinGroup.setAttribute('transform','rotate('+visTilt+' 120 150)');
+    var y0=220, topY=40, vSpan=y0-topY, pxPerYd=vSpan/D;
+    var startPx=launchYd*pxPerYd, offPx=curveYd*pxPerYd;
+    var x0=280, xEnd=280+startPx+offPx, xMid=280+startPx*0.55+offPx*0.25;
+    flightPath.setAttribute('d','M '+x0+' '+y0+' Q '+xMid+' '+((y0+topY)/2)+' '+xEnd+' '+topY);
+    pathLine.setAttribute('x2',280+p*(D/100)*pxPerYd); pathLine.setAttribute('y2',topY);
+    landing.setAttribute('cx',xEnd); landing.setAttribute('cy',topY);
+    offLine.setAttribute('x1',280); offLine.setAttribute('y1',topY);
+    offLine.setAttribute('x2',xEnd); offLine.setAttribute('y2',topY);
+    offText.textContent=(offR!==0?(Math.abs(offR)+' yd '+(offR>0?'R':'L')):'');
+    offText.setAttribute('x',(280+xEnd)/2); offText.setAttribute('y',topY-7);
+    scaleLbl.textContent='scale: '+Math.round(50*pxPerYd)+'px = 50 yd';
+    geom={x0:x0,y0:y0,xMid:xMid,xEnd:xEnd,topY:topY};
+  }
+  update();
+  function animate(){
+    t+=0.012; if(t>1)t=0;
+    var u=1-t;
+    var bx=u*u*geom.x0+2*u*t*geom.xMid+t*t*geom.xEnd;
+    var by=u*u*geom.y0+2*u*t*((geom.y0+geom.topY)/2)+t*t*geom.topY;
+    ball.setAttribute('cx',bx); ball.setAttribute('cy',by);
+    var ph=(Date.now()/220)%(Math.PI*2),r=Math.abs(Math.cos(ph));
+    eq1.setAttribute('ry',8+r*60); eq1.setAttribute('opacity',0.35+r*0.55);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+  face.addEventListener('input',update); path.addEventListener('input',update); dist.addEventListener('input',update);
+  document.querySelectorAll('.presets button[data-f]').forEach(function(b){
+    b.addEventListener('click',function(){ face.value=b.dataset.f; path.value=b.dataset.p; t=0; update(); });
+  });
+  $('reset').addEventListener('click',function(){ face.value=DEF.f; path.value=DEF.p; dist.value=DEF.d; t=0; update(); });
+})();
+</script>
+</body>
+</html>
