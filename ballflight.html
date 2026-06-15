@@ -24,6 +24,7 @@
   .wrap{ max-width:680px; margin:0 auto; }
   h1{ font-size:22px; font-weight:500; margin:0 0 4px; }
   .sub{ color:var(--text2); font-size:14px; margin:0 0 1.5rem; }
+  .ver{ font-size:11px; color:var(--text3); font-weight:400; margin-left:8px; vertical-align:middle; letter-spacing:0.02em; }
   .ctrls{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1.25rem; }
   .ctrl-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
   label{ font-size:13px; color:var(--text2); }
@@ -50,7 +51,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path</h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.2</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
 
   <div class="ctrls">
@@ -147,6 +148,8 @@
     <button data-f="-1" data-p="-3">Pull-fade</button>
     <button data-f="1" data-p="3">Push-draw</button>
     <button data-f="0" data-p="0">Straight</button>
+    <button data-f="2" data-p="3">Perfect Draw</button>
+    <button data-f="-2" data-p="-3">Perfect Fade</button>
     <button data-f="4" data-p="-2">Slice</button>
     <button data-f="-4" data-p="2">Hook</button>
     <button id="reset">&#8634; Reset</button>
