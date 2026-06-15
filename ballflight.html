@@ -55,7 +55,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Golf spin axis — face vs path <span class="ver">v1.6</span></h1>
+  <h1>Golf spin axis — face vs path <span class="ver">v1.7</span></h1>
   <p class="sub">Adjust the clubface, club path, and carry distance to see how the spin axis tilts and where the ball lands. Flight is drawn to scale.</p>
 
   <div class="club-toggle" role="tablist" aria-label="Club type">
@@ -242,7 +242,10 @@
     shapeOut.textContent=shapeName(axis,p);
     flightLbl.innerHTML='carry '+D+' yd &middot; offline '+Math.abs(offR)+' yd '+(offR>0?'right':offR<0?'left':'center');
     pathGroup.setAttribute('transform','rotate('+(p*2.4)+' 150 158)');
-    clubGroup.setAttribute('transform','rotate('+(f*2.4)+' 150 158)');
+    // clubGroup transform is set every frame by animate() so the swing animation can slide
+    // the clubhead along the path; we still call renderClub() here for an immediate refresh
+    // when the user moves a slider (so face direction updates instantly without waiting a frame).
+    renderClub();
     var visTilt=Math.max(-45,Math.min(45,axis));
     spinGroup.setAttribute('transform','rotate('+visTilt+' 120 150)');
     var y0=220, topY=40, vSpan=y0-topY, pxPerYd=vSpan/D;
@@ -262,11 +265,36 @@
     geom={x0:x0,y0:y0,xMid:xMid,xEnd:xEnd,topY:topY};
   }
   update();
+  // Swing/flight animation:
+  //   t ∈ [0, IMPACT_T): approach — clubhead slides along path from -90 px → 0 (impact)
+  //   t ∈ [IMPACT_T, FOLLOW_T): follow-through — clubhead continues 0 → +30 px past ball
+  //   t ∈ [IMPACT_T, 1): ball flight begins at impact and continues to landing
+  var IMPACT_T=0.22, FOLLOW_T=0.42;
+  function renderClub(){
+    var f=parseFloat(face.value), p=parseFloat(path.value);
+    var pathRad=p*2.4*Math.PI/180;
+    var d;
+    if(t<IMPACT_T){
+      var s=t/IMPACT_T; s=s*s*(3-2*s); // smoothstep accel into impact
+      d=-90*(1-s);
+    } else if(t<FOLLOW_T){
+      d=30*((t-IMPACT_T)/(FOLLOW_T-IMPACT_T));
+    } else {
+      d=30;
+    }
+    var tx=d*Math.sin(pathRad), ty=-d*Math.cos(pathRad);
+    clubGroup.setAttribute('transform','translate('+tx.toFixed(2)+' '+ty.toFixed(2)+') rotate('+(f*2.4)+' 150 158)');
+  }
   function animate(){
-    t+=0.012; if(t>1)t=0;
-    var u=1-t;
-    var bx=u*u*geom.x0+2*u*t*geom.xMid+t*t*geom.xEnd;
-    var by=u*u*geom.y0+2*u*t*((geom.y0+geom.topY)/2)+t*t*geom.topY;
+    t+=0.008; if(t>1)t=0;
+    renderClub();
+    var bx,by;
+    if(t<IMPACT_T){ bx=geom.x0; by=geom.y0; }
+    else {
+      var ft=(t-IMPACT_T)/(1-IMPACT_T), u=1-ft;
+      bx=u*u*geom.x0+2*u*ft*geom.xMid+ft*ft*geom.xEnd;
+      by=u*u*geom.y0+2*u*ft*((geom.y0+geom.topY)/2)+ft*ft*geom.topY;
+    }
     ball.setAttribute('cx',bx); ball.setAttribute('cy',by);
     requestAnimationFrame(animate);
   }
